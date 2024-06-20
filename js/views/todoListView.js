@@ -5,11 +5,13 @@ app.ToDoListView = Backbone.View.extend({
     initialize: function() {
         this.collection = new app.TodoItems();  // Adjust as needed
         this.collection.fetch({ reset: true });  // Fetch data from backend
+        debugger
         this.render();
         this.listenTo(this.collection, 'reset', this.render);
     },
-
+    
     render: function() {
+        debugger
         this.$el.empty();
         this.collection.each(function(item) {
             var itemView = new app.ToDoItemView({ model: item });

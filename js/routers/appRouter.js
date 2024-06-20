@@ -14,6 +14,7 @@ app.AppRouter = Backbone.Router.extend({
     },
 
     todoList: function() {
+        debugger
         var todoListView = new app.ToDoListView();
         todoListView.render();
     },
