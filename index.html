@@ -47,6 +47,10 @@
         <div id="popupForm">
             <input type="text" id="title" placeholder="Title"><br>
             <textarea id="description" placeholder="Description"></textarea><br>
+            <label for="status">Status:</label>
+            <select id="status">
+                <!-- Options will be dynamically populated -->
+            </select><br>
             <button id="saveBtn">Save</button>
         </div>
 
@@ -54,6 +58,10 @@
         <div id="editForm">
             <input type="text" id="editTitle" placeholder="Title"><br>
             <textarea id="editDescription" placeholder="Description"></textarea><br>
+            <label for="editStatus">Status:</label>
+            <select id="editStatus">
+                <!-- Options will be dynamically populated -->
+            </select><br>
             <button id="updateBtn">Update</button>
         </div>
     </nav>
@@ -77,14 +85,17 @@
         defaults: {
             title: '',
             description: '',
-            completed: false,
-            user: {}
+            user: {},
+            status: {}
         },
         url: function() {
             if (this.isNew()) {
-                return 'http://localhost:8080/todo_application/todoitems/' + this.get('user').id;
+                // For creating a new ToDoItem
+                debugger
+                return 'http://localhost:8080/todo_application/todoitems/' + this.get('user').id + '/' + this.get('status').id;
             } else {
-                return 'http://localhost:8080/todo_application/todoitems/' + this.id;
+                // For updating an existing ToDoItem
+                return 'http://localhost:8080/todo_application/todoitems/' + this.id + '/' + this.get('status').id;
             }
         }
     });
@@ -100,6 +111,7 @@
         template: _.template(
             '<td><%= title %></td>' +
             '<td><%= description %></td>' +
+            '<td><%= status.name %></td>' +
             '<td>' +
                 '<button class="edit-btn">Edit</button>' +
                 '<button class="delete-btn">Delete</button>' +
@@ -112,6 +124,7 @@
         },
 
         render: function() {
+            // debugger
             this.$el.html(this.template(this.model.toJSON()));
             return this;
         },
@@ -120,6 +133,7 @@
             // Show the edit form and populate with current values
             $('#editTitle').val(this.model.get('title'));
             $('#editDescription').val(this.model.get('description'));
+            $('#editStatus').val(this.model.get('status').id);
             $('#editForm').data('model', this.model).show();
         },
 
@@ -148,15 +162,18 @@
         el: '#grid',
 
         initialize: function() {
+            // debugger
             this.collection = new app.TodoItems();
             this.collection.fetch({ reset: true });
             this.listenTo(this.collection, 'reset', this.render);
         },
 
         render: function() {
+            // debugger
             var gridColumns = [
                 { name: 'title', label: 'Title', cell: 'string' },
                 { name: 'description', label: 'Description', cell: 'string' },
+                { name: 'status.name', label: 'Status', cell: 'string' },
                 { name: 'actions', label: 'Actions', cell: Backgrid.Cell.extend({
                     render: function () {
                         this.$el.html(
@@ -186,7 +203,33 @@
     $(document).ready(function() {
         todoListView = new app.TodoListView();
         todoListView.render();
+        fetchStatusOptions(); 
     });
+
+    // Function to fetch status options and populate dropdowns
+    function fetchStatusOptions() {
+        $.ajax({
+            url: 'http://localhost:8080/todo_application/status', // Endpoint to fetch status options
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                populateStatusDropdowns(response);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error fetching status options:', error);
+            }
+        });
+    }
+
+    // Function to populate status dropdowns
+    function populateStatusDropdowns(statusOptions) {
+        var options = '';
+        statusOptions.forEach(function(status) {
+            options += '<option value="' + status.id + '">' + status.name + '</option>';
+        });
+
+        $('#status, #editStatus').html(options);
+    }
 
     // Handling add new item button click
     $(document).on('click', '#addNewItemBtn', function() {
@@ -195,50 +238,83 @@
 
     // Handling save button click
     $(document).on('click', '#saveBtn', function() {
-        var userId = 52; // Replace with actual user ID
-        var newTodoItem = new app.TodoItem({
-            title: $('#title').val(),
-            description: $('#description').val(),
-            completed: false,
-            user: { id: userId }
-        });
+    var userId = getCurrentUserId(); 
 
-        newTodoItem.save({}, {
-            success: function(model, response) {
-                console.log('New item saved:', response);
-                $('#popupForm').hide();
-                todoListView.collection.add(newTodoItem);
-                alert('New Item Added!');
-            },
-            error: function(model, response) {
-                console.error('Error saving item:', response);
-                alert('Error saving item. Please try again.');
-            }
-        });
-
+    // Create a new Todo item with data from the form
+    var newTodoItem = new app.TodoItem({
+        title: $('#title').val().trim(), // Trim to remove extra spaces
+        description: $('#description').val().trim(),
+        user: { id: userId },
+        status: { id: $('#status').val() } // Assign selected status
     });
+
+    // Basic form validation
+    if (!newTodoItem.get('title') || !newTodoItem.get('description')) {
+        alert('Title and description are required.');
+        return;
+    }
+
+    // Save the new item to the server
+    newTodoItem.save(null, {
+        type: 'POST',
+        success: function(model, response) {
+            debugger
+            console.log('New item saved:', response);
+            $('#popupForm').hide();
+            todoListView.collection.add(newTodoItem);
+            alert('New Item Added!');
+        },
+        error: function(model, response) {
+            debugger
+            console.error('Error saving item:', response);
+            alert('Error saving item. Please try again.');
+        }
+    });
+});
+
+// Function to get the current user's ID dynamically
+function getCurrentUserId() {
+    // Implement this function to return the actual user ID
+    // For example, this could be from a logged-in user session
+    return 52;
+}
+
 
     // Handling update button click
-    $(document).on('click', '#updateBtn', function() {
-        var model = $('#editForm').data('model');
-        model.set({
-            title: $('#editTitle').val(),
-            description: $('#editDescription').val()
-        });
+$(document).on('click', '#updateBtn', function() {
+var model = $('#editForm').data('model');
 
-        model.save({}, {
-            success: function() {
-                console.log('Item updated');
-                $('#editForm').hide();
-                todoListView.render();
-                alert('Item Updated Successfully!');
-            },
-            error: function() {
-                console.error('Error updating item');
-                alert('Error updating item. Please try again.');
-            }
-        });
-    });
+// Update model attributes with form values
+model.set({
+    title: $('#editTitle').val().trim(), // Trim to remove extra spaces
+    description: $('#editDescription').val().trim(),
+    status: { id: $('#editStatus').val() } // Assign selected status
+});
+
+// Basic form validation
+if (!model.get('title') || !model.get('description')) {
+    alert('Title and description are required.');
+    return;
+}
+
+// Save updated model to the server
+model.save({}, {
+    type: 'PUT',
+    url: 'http://localhost:8080/todo_application/todoitems/' + model.id + '/' + model.get('status').id,
+    success: function() {
+        console.log('Item updated');
+        $('#editForm').hide();
+        todoListView.render(); // Re-render the list view
+        alert('Item Updated Successfully!');
+    },
+    error: function(model, response) {
+        console.error('Error updating item:', response);
+        alert('Error updating item. Please try again.');
+    }
+});
+});
+
+
 </script>
 </body>
 </html>
